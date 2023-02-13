@@ -62,11 +62,26 @@ public class ButtonController : MonoBehaviour
         }
     }
 
+    void CheckWebsiteResponse(string website, UnityWebRequest request)
+    {
+       if (request.isDone)
+        {
+            if (request.result == UnityWebRequest.Result.ConnectionError || request.responseCode != (long)HttpStatusCode.OK)
+            {
+                Debug.Log("Webtite " + website + " failed loading. Response code :" + request.responseCode);
+            }
+            else
+            {
+                Debug.Log("Webtite " + website + " successfully loaded. Response code :" + request.responseCode);
+            }
+        }
+        return;
+    }
+   
+
     async UniTask TestWebsiteResponse1(string[] webs) 
     {
         var cts = new System.Threading.CancellationTokenSource();
-        var cts1 = new System.Threading.CancellationTokenSource();
-        var cts2 = new System.Threading.CancellationTokenSource();
 
         var progress = Progress.Create<float>(x => Debug.Log(x));
         var startTime = DateTime.Now;
@@ -76,23 +91,49 @@ public class ButtonController : MonoBehaviour
         var request2 = UnityWebRequest.Get(webs[2]);
 
         request.SendWebRequest();
+        request1.SendWebRequest();
+        request2.SendWebRequest();
 
-        await UniTask.WaitWhile(() => !request.isDone, cancellationToken: cts.Token);
+        /* await UniTask.WaitWhile(() => !request.isDone && !request1.isDone && !request2.isDone , cancellationToken: cts.Token);
+         await UniTask.WaitUntil(() => request.isDone && !request1.isDone && !request2.isDone || );*/
 
         var endTime = DateTime.Now;
         var elapsedTime = endTime - startTime;
+        while (elapsedTime.TotalSeconds <= 8 || (request.isDone && request1.isDone && request2.isDone))
+        {
+            CheckWebsiteResponse(webs[0] ,request1);
+            CheckWebsiteResponse(webs[1], request2);
+            CheckWebsiteResponse(webs[2], request2);
+            if (request.isDone && request1.isDone && request2.isDone)
+            {
+                return;
+            }
 
-        if (elapsedTime.TotalSeconds > 3)
-        {
-            cts.Cancel();
-            Debug.Log("Response code: " + request.responseCode);
-            Debug.Log("Request took more than 3 seconds and was cancelled.");
+            endTime = DateTime.Now;
+            elapsedTime = endTime - startTime;
         }
-        else
-        {
-            Debug.Log("Request completed in less than 3 seconds.");
-            Debug.Log("Response code: " + request.responseCode);
-        }
+        cts.Cancel();
+       
+    }
+
+    async UniTask<string> GetTextAsync(UnityWebRequest req)
+    {
+        var op = await req.SendWebRequest();
+        return op.downloadHandler.text;
+    }
+
+    async UniTask TestWebsitesResponse (string[] webs)
+    {
+
+        var task1 = GetTextAsync(UnityWebRequest.Get("http://google.com"));
+        var task2 = GetTextAsync(UnityWebRequest.Get("http://bing.com"));
+        var task3 = GetTextAsync(UnityWebRequest.Get("http://yahoo.com"));
+
+        // concurrent async-wait and get results easily by tuple syntax
+        var (google, bing, yahoo) = await UniTask.WhenAll(task1, task2, task3);
+
+        // shorthand of WhenAll, tuple can await directly
+        var (google2, bing2, yahoo2) = await (task1, task2, task3);
     }
 
     async void func()
@@ -112,6 +153,10 @@ public class ButtonController : MonoBehaviour
         actionStart += func;
         startButton.onClick.AddListener(actionStart);
      }
+    private void Update()
+    {
+        
+    }
 
-     
+
 }
