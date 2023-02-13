@@ -7,6 +7,7 @@ using System.Net;
 using UnityEngine.Networking;
 using Cysharp.Threading.Tasks;
 using UnityEngine.Events;
+using System;
 
 
 public class ButtonController : MonoBehaviour
@@ -41,10 +42,11 @@ public class ButtonController : MonoBehaviour
     async UniTask TestWebsiteResponse(string[] webs)
     {
         var progress = Progress.Create<float>(x => Debug.Log(x));
+        var progress1 = Progress.Create<float>(x => Debug.Log(x));
 
-        var requestt = await UnityWebRequest.Get("www.amazon.fr")
+       /*var requestt = await UnityWebRequest.Get("www.amazon.fr")
             .SendWebRequest()
-            .ToUniTask(progress: progress);
+            .ToUniTask(progress: progress, timing: progress1 );*/
 
         using (var request = UnityWebRequest.Get("www.amazon.fr"))
         {
@@ -59,12 +61,38 @@ public class ButtonController : MonoBehaviour
 
         }
     }
+
+    async UniTask TestWebsiteResponse1(string[] webs) 
+    {
+        var cts = new System.Threading.CancellationTokenSource();;
+        var progress = Progress.Create<float>(x => Debug.Log(x));
+        var startTime = DateTime.Now;
+
+        var request = UnityWebRequest.Get("www.amazon.fr");
+        request.SendWebRequest();
+
+        await UniTask.WaitWhile(() => !request.isDone, cancellationToken: cts.Token);
+
+        var endTime = DateTime.Now;
+        var elapsedTime = endTime - startTime;
+
+        if (elapsedTime.TotalSeconds > 3)
+        {
+            cts.Cancel();
+            Debug.Log("Request took more than 3 seconds and was cancelled.");
+        }
+        else
+        {
+            Debug.Log("Request completed in less than 3 seconds.");
+        }
+    }
+
     async void func()
     {
 
-        await TestWebsiteResponse(websites1);
-        await TestWebsiteResponse(websites2);
-        await TestWebsiteResponse(websites3);
+        await TestWebsiteResponse1(websites1);
+       /* await TestWebsiteResponse(websites2);
+        await TestWebsiteResponse(websites3);*/
     }
    
     
