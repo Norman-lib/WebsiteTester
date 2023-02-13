@@ -64,11 +64,17 @@ public class ButtonController : MonoBehaviour
 
     async UniTask TestWebsiteResponse1(string[] webs) 
     {
-        var cts = new System.Threading.CancellationTokenSource();;
+        var cts = new System.Threading.CancellationTokenSource();
+        var cts1 = new System.Threading.CancellationTokenSource();
+        var cts2 = new System.Threading.CancellationTokenSource();
+
         var progress = Progress.Create<float>(x => Debug.Log(x));
         var startTime = DateTime.Now;
 
-        var request = UnityWebRequest.Get("www.amazon.fr");
+        var request = UnityWebRequest.Get(webs[0]);
+        var request1 = UnityWebRequest.Get(webs[1]);
+        var request2 = UnityWebRequest.Get(webs[2]);
+
         request.SendWebRequest();
 
         await UniTask.WaitWhile(() => !request.isDone, cancellationToken: cts.Token);
@@ -79,11 +85,13 @@ public class ButtonController : MonoBehaviour
         if (elapsedTime.TotalSeconds > 3)
         {
             cts.Cancel();
+            Debug.Log("Response code: " + request.responseCode);
             Debug.Log("Request took more than 3 seconds and was cancelled.");
         }
         else
         {
             Debug.Log("Request completed in less than 3 seconds.");
+            Debug.Log("Response code: " + request.responseCode);
         }
     }
 
