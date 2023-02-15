@@ -5,11 +5,13 @@ using System.Collections;
 using TMPro;
 using System.Net;
 using UnityEngine.Networking;
+using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using System.Threading;
 using UnityEngine.Events;
 using System;
 using Cysharp.Threading.Tasks.Linq;
+using System.Collections.Generic;
 
 
 public class ButtonController : MonoBehaviour
@@ -19,19 +21,22 @@ public class ButtonController : MonoBehaviour
     public Button stopButton;
     public Button errorButton;
 
-  
-  
 
-    bool isStartClicked = false;
+    bool isStartClicked = true;
+    bool isEchecClicked = false;
     bool isCancelClicked = false;
+
+    bool testing = false;
 
     UnityAction actionStart;
     UnityAction actionStop;
     UnityAction actionError;
 
-    UnityWebRequest request;
-    UnityWebRequest request1;
-    UnityWebRequest request2;
+    static UnityWebRequest request;
+    static UnityWebRequest request1;
+    static UnityWebRequest request2;
+
+    int testedIndex = 0;
 
 
     DateTime startTime;
@@ -39,26 +44,28 @@ public class ButtonController : MonoBehaviour
     TimeSpan elapsedTime;
 
 
-    bool[] isTested = { false, false, false };
+    static bool[] isTested = { false, false, false };
 
 
 
-    string[] websites1 =
+   static string[] websites1 =
     {
         "www.amazon.fr",
         "www.google.fr",
         "https://drivronlinebackendtest.azurewebsites.net/api/v1/Applications",
     };
-    string[] websites2 = {
+    static string[] websites2 = {
         "www.microsoft.fr",
         "drivr.online",
         "www.sfr.fr",
     };
-    string[] websites3 = {
+    static string[] websites3 = {
         "www.easyjet.fr",
         "https://drivronlinebackendtest.azurewebsites.net/api/v1/ApplicationConfiguration/parameters",
         "https://github.com/picoxr/support",
     };
+
+    List<string[]> allWebsites = new List<string[]> { websites1, websites2, websites3 };
 
     string[] CurrentlyTestedWebs;
     
@@ -85,17 +92,17 @@ public class ButtonController : MonoBehaviour
         }
     }*/
 
-    void CheckWebsiteResponse(string website, UnityWebRequest request)
+    public void CheckWebsiteResponse(string website, UnityWebRequest request, TimeSpan time)
     {
         if (request.isDone)
         {
             if (request.result == UnityWebRequest.Result.ConnectionError || request.responseCode != (long)HttpStatusCode.OK)
             {
-                Debug.Log("Website " + website + " failed loading. Response code :" + request.responseCode);
+                Debug.Log("Website " + website + " failed loading. Response code :" + request.responseCode + ", Response time : " + time.TotalMilliseconds + "ms");
             }
             else
             {
-                Debug.Log("Website " + website + " successfully loaded. Response code :" + request.responseCode);
+                Debug.Log("Website " + website + " successfully loaded. Response code :" + request.responseCode + ", Response time : " + time.TotalMilliseconds + "ms");
             }
 
             return;
@@ -105,6 +112,10 @@ public class ButtonController : MonoBehaviour
 
     async UniTask TestWebsiteResponse2(string[] webs)
     {
+        if (isEchecClicked)
+        {
+            return;
+        }
         //getting the 3 tested websites
         CurrentlyTestedWebs = webs;
         var cancelToken = new CancellationTokenSource();
@@ -146,10 +157,13 @@ public class ButtonController : MonoBehaviour
 
             await UniTask.WaitWhile((() => !(request.isDone && request1.isDone && request2.isDone)), cancellationToken: linkedTokens.Token);
             //   await UnityWebRequest.Get("http://foo").SendWebRequest().WithCancellation(linkedTokenSource.Token);
-          
-          /*  CheckWebsiteResponse(webs[0], request);
-            CheckWebsiteResponse(webs[1], request1);
-            CheckWebsiteResponse(webs[2], request2);*/
+            /* currentTime = DateTime.Now;
+             elapsedTime = currentTime - startTime;*/
+
+            CheckWebsiteResponse(webs[0], request, elapsedTime);
+            CheckWebsiteResponse(webs[1], request1, elapsedTime);
+            CheckWebsiteResponse(webs[2], request2, elapsedTime);
+
 
         }
 
@@ -158,15 +172,15 @@ public class ButtonController : MonoBehaviour
 
             if (timeoutToken.IsCancellationRequested)
             {
-                Debug.Log("Website" + webs[0] + "took more than 8 seconds");
+                Debug.Log("Website" + webs[0] + " is inactive, It took more than 8 seconds");
             }
             else if (timeoutToken1.IsCancellationRequested)
             {
-                Debug.Log("Website" + webs[1] + "took more than 8 seconds");
+                Debug.Log("Website" + webs[1] +" is inactive, It took more than 8 seconds");
             }
             else if (timeoutToken.IsCancellationRequested)
             {
-                Debug.Log("Website" + webs[2] + "took more than 8 seconds");
+                Debug.Log("Website" + webs[2] + " is inactive, It took more than 8 seconds");
             }
             else if (cancelToken.IsCancellationRequested)
             {
@@ -179,34 +193,16 @@ public class ButtonController : MonoBehaviour
         }
         catch (UnityWebRequestException ex)
         {
-
+            return;
         }
         catch (Exception ex)
         {
+            return;
 
         }
     }
 
-    private void Update()
-    {
-
-        if (request.isDone && !isTested[0])
-        {
-            isTested[0] = true;
-            CheckWebsiteResponse(CurrentlyTestedWebs[0], request);
-        }
-        else if (request1.isDone)
-        {
-            isTested[1] = true;
-            CheckWebsiteResponse(CurrentlyTestedWebs[1], request1);
-        }
-        else if (request2.isDone)
-        {
-            isTested[2] = true;
-            CheckWebsiteResponse(CurrentlyTestedWebs[1], request2);
-        }
-
-    }
+   
 
     /* async void TestWebsiteResponse1(string[] webs)
      {
@@ -268,34 +264,60 @@ public class ButtonController : MonoBehaviour
     void start()
     {
         isStartClicked = true;
+        isEchecClicked = false;
         isCancelClicked = false;
     }
 
+    Exception echecException = new Exception("You have stoped the website verification, all operations will be stopped");
     async void func()
     {
+        if (isEchecClicked)
+        {
+          //  return;
+            
+                throw echecException;
+          
+        }
+
+        if (testedIndex == 2)
+        {
+            testedIndex = 0;
+        } 
+        else
+        {
+            testedIndex ++ ;
+        }
+
         stopButton.gameObject.SetActive(true);
         errorButton.gameObject.SetActive(true);
         
        
         if (! isCancelClicked) 
         {
-            await TestWebsiteResponse2(websites1);
-            isTested = new bool[] { false, false, false};
-            await TestWebsiteResponse2(websites2);
+            CurrentlyTestedWebs = allWebsites[testedIndex];
             isTested = new bool[] { false, false, false };
-            await TestWebsiteResponse2(websites3);
-
-            func();
+            await TestWebsiteResponse2(allWebsites[testedIndex]);
         }
+        else
+        {
+            return;
+        }
+        testing = false;
 }
         
-    
+    void echec ()
+    {
+        isEchecClicked = true;
+        isStartClicked = false;
+
+    }
    
 
      void stop ()
      {
-        isCancelClicked = true;
         isStartClicked = false;
+        isCancelClicked = true;
+        isEchecClicked = false;
      }
     // Start is called before the first frame update
        void Start()
@@ -303,66 +325,117 @@ public class ButtonController : MonoBehaviour
         stopButton.gameObject.SetActive(false);
         errorButton.gameObject.SetActive(false);
         actionStart += start;
-        actionStart += func;
         actionStop += stop;
+        actionError += echec;
         startButton.onClick.AddListener(actionStart);
         stopButton.onClick.AddListener(actionStop);
+        errorButton.onClick.AddListener(actionError);
        }
-    
-
-
-     
-
-/*private void Updatee()
+    private async void Update()
     {
-        if (isStartClicked)
+        if ( isStartClicked || isEchecClicked || isCancelClicked) 
         {
-             currentTime = DateTime.Now;
-             elapsedTime = currentTime - startTime;
-          //  Debug.Log(elapsedTime.TotalSeconds);
-            if (elapsedTime.TotalSeconds < 8)
+            if (isStartClicked)
             {
-                if (request.isDone && !isResponsePrinted)
-                {
-                    isResponsePrinted = true;
-                    if (request.result == UnityWebRequest.Result.ConnectionError || request.responseCode != (long)HttpStatusCode.OK)
-                    {
-                        Debug.Log("Webtite " + websites1[0] + " failed loading. Response code :" + request.responseCode);
-                    }
-                    else
-                    {
-                        Debug.Log("Webtite " + websites1[0] + " successfully loaded. Response code :" + request.responseCode);
-                    }
-                }
-                if (request1.isDone && !isResponsePrinted1)
-                {
-                    isResponsePrinted1 = true;
-                    if (request1.result == UnityWebRequest.Result.ConnectionError || request1.responseCode != (long)HttpStatusCode.OK)
-                    {
-                        Debug.Log("Webtite " + websites1[1] + " failed loading. Response code :" + request1.responseCode);
-                    }
-                    else
-                    {
-                        Debug.Log("Webtite " + websites1[1] + " successfully loaded. Response code :" + request1.responseCode);
-                    }
-                }  if (request2.isDone && !isResponsePrinted2)
-                {
-                    isResponsePrinted2 = true;
-                    if (request2.result == UnityWebRequest.Result.ConnectionError || request2.responseCode != (long)HttpStatusCode.OK)
-                    {
-                        Debug.Log("Webtite " + websites1[2] + " failed loading. Response code :" + request2.responseCode);
-                    }
-                    else
-                    {
-                        Debug.Log("Webtite " + websites1[2] + " successfully loaded. Response code :" + request2.responseCode);
-                    }
-                }
-            } else
+                startButton.gameObject.SetActive(true);
+                stopButton.gameObject.SetActive(false);
+                errorButton.gameObject.SetActive(false);
+            }
+            else
             {
-                Debug.Log("time ends");
+                startButton.gameObject.SetActive(false);
+                stopButton.gameObject.SetActive(true);
+                errorButton.gameObject.SetActive(true);
             }
         }
-    }*/
-   
+       
+
+        {
+            startButton.gameObject.SetActive(false);
+        }
+
+        if (isStartClicked && !testing)
+        {
+            testing = true;
+             func();
+        }
+
+
+       /* currentTime = DateTime.Now;
+        elapsedTime = currentTime - startTime;
+
+        if (request != null && request.isDone && !isTested[0])
+        {
+            isTested[0] = true;
+            CheckWebsiteResponse(CurrentlyTestedWebs[0], request, elapsedTime);
+        }
+        if (request1 != null && request1.isDone && isTested[1])
+        {
+            isTested[1] = true;
+            CheckWebsiteResponse(CurrentlyTestedWebs[1], request1, elapsedTime);
+        }
+        if (request2 != null && request2.isDone && isTested[2])
+        {
+            isTested[2] = true;
+            CheckWebsiteResponse(CurrentlyTestedWebs[1], request2, elapsedTime);
+        }*/
+
+    }
+
+
+
+
+
+    /*private void Updatee()
+        {
+            if (isStartClicked)
+            {
+                 currentTime = DateTime.Now;
+                 elapsedTime = currentTime - startTime;
+              //  Debug.Log(elapsedTime.TotalSeconds);
+                if (elapsedTime.TotalSeconds < 8)
+                {
+                    if (request.isDone && !isResponsePrinted)
+                    {
+                        isResponsePrinted = true;
+                        if (request.result == UnityWebRequest.Result.ConnectionError || request.responseCode != (long)HttpStatusCode.OK)
+                        {
+                            Debug.Log("Webtite " + websites1[0] + " failed loading. Response code :" + request.responseCode);
+                        }
+                        else
+                        {
+                            Debug.Log("Webtite " + websites1[0] + " successfully loaded. Response code :" + request.responseCode);
+                        }
+                    }
+                    if (request1.isDone && !isResponsePrinted1)
+                    {
+                        isResponsePrinted1 = true;
+                        if (request1.result == UnityWebRequest.Result.ConnectionError || request1.responseCode != (long)HttpStatusCode.OK)
+                        {
+                            Debug.Log("Webtite " + websites1[1] + " failed loading. Response code :" + request1.responseCode);
+                        }
+                        else
+                        {
+                            Debug.Log("Webtite " + websites1[1] + " successfully loaded. Response code :" + request1.responseCode);
+                        }
+                    }  if (request2.isDone && !isResponsePrinted2)
+                    {
+                        isResponsePrinted2 = true;
+                        if (request2.result == UnityWebRequest.Result.ConnectionError || request2.responseCode != (long)HttpStatusCode.OK)
+                        {
+                            Debug.Log("Webtite " + websites1[2] + " failed loading. Response code :" + request2.responseCode);
+                        }
+                        else
+                        {
+                            Debug.Log("Webtite " + websites1[2] + " successfully loaded. Response code :" + request2.responseCode);
+                        }
+                    }
+                } else
+                {
+                    Debug.Log("time ends");
+                }
+            }
+        }*/
+
 
 }
