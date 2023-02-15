@@ -19,6 +19,9 @@ public class ButtonController : MonoBehaviour
     public Button stopButton;
     public Button errorButton;
 
+  
+  
+
     bool isStartClicked = false;
     bool isCancelClicked = false;
 
@@ -26,12 +29,17 @@ public class ButtonController : MonoBehaviour
     UnityAction actionStop;
     UnityAction actionError;
 
+    UnityWebRequest request;
+    UnityWebRequest request1;
+    UnityWebRequest request2;
+
+
     DateTime startTime;
     DateTime currentTime;
     TimeSpan elapsedTime;
 
 
-
+    bool[] isTested = { false, false, false };
 
 
 
@@ -51,6 +59,9 @@ public class ButtonController : MonoBehaviour
         "https://drivronlinebackendtest.azurewebsites.net/api/v1/ApplicationConfiguration/parameters",
         "https://github.com/picoxr/support",
     };
+
+    string[] CurrentlyTestedWebs;
+    
   /*  async UniTask TestWebsiteResponse(string[] webs)
     {
         var progress = Progress.Create<float>(x => Debug.Log(x));
@@ -76,21 +87,26 @@ public class ButtonController : MonoBehaviour
 
     void CheckWebsiteResponse(string website, UnityWebRequest request)
     {
-
-        if (request.result == UnityWebRequest.Result.ConnectionError || request.responseCode != (long)HttpStatusCode.OK)
+        if (request.isDone)
         {
-            Debug.Log("Website " + website + " failed loading. Response code :" + request.responseCode);
-        }
-        else
-        {
-            Debug.Log("Website " + website + " successfully loaded. Response code :" + request.responseCode);
-        }
+            if (request.result == UnityWebRequest.Result.ConnectionError || request.responseCode != (long)HttpStatusCode.OK)
+            {
+                Debug.Log("Website " + website + " failed loading. Response code :" + request.responseCode);
+            }
+            else
+            {
+                Debug.Log("Website " + website + " successfully loaded. Response code :" + request.responseCode);
+            }
 
-        return;
+            return;
+        }
+       
     }
 
     async UniTask TestWebsiteResponse2(string[] webs)
     {
+        //getting the 3 tested websites
+        CurrentlyTestedWebs = webs;
         var cancelToken = new CancellationTokenSource();
         stopButton.onClick.AddListener(() =>
         {
@@ -105,11 +121,11 @@ public class ButtonController : MonoBehaviour
         timeoutToken2.CancelAfterSlim(TimeSpan.FromSeconds(8));
 
         //defining the requests
-        UnityWebRequest request = UnityWebRequest.Get(webs[0]);
-        UnityWebRequest request1 = UnityWebRequest.Get(webs[1]);
-        UnityWebRequest request2 = UnityWebRequest.Get(webs[2]);
+         request = UnityWebRequest.Get(webs[0]);
+         request1 = UnityWebRequest.Get(webs[1]);
+         request2 = UnityWebRequest.Get(webs[2]);
 
-
+        
 
         try
         {
@@ -119,18 +135,22 @@ public class ButtonController : MonoBehaviour
             var linkedTokenSource2 = CancellationTokenSource.CreateLinkedTokenSource(cancelToken.Token, timeoutToken2.Token);
 
             var linkedTokens = CancellationTokenSource.CreateLinkedTokenSource(cancelToken.Token, timeoutToken1.Token, timeoutToken2.Token, timeoutToken.Token);
+            //starting timer
+            startTime = DateTime.Now;
 
             //sending the requests
 
-            UniTask task = request.SendWebRequest().WithCancellation(linkedTokenSource.Token);
-            UniTask task1 = request1.SendWebRequest().WithCancellation(linkedTokenSource1.Token);
-            UniTask task2 = request2.SendWebRequest().WithCancellation(linkedTokenSource2.Token);
+            UniTask task = request.SendWebRequest().ToUniTask(cancellationToken: linkedTokenSource.Token);
+            UniTask task1 = request1.SendWebRequest().ToUniTask(cancellationToken: linkedTokenSource1.Token);
+            UniTask task2 = request2.SendWebRequest().ToUniTask(cancellationToken: linkedTokenSource2.Token);
 
             await UniTask.WaitWhile((() => !(request.isDone && request1.isDone && request2.isDone)), cancellationToken: linkedTokens.Token);
             //   await UnityWebRequest.Get("http://foo").SendWebRequest().WithCancellation(linkedTokenSource.Token);
-            CheckWebsiteResponse(webs[0], request);
+          
+          /*  CheckWebsiteResponse(webs[0], request);
             CheckWebsiteResponse(webs[1], request1);
-            CheckWebsiteResponse(webs[2], request2);
+            CheckWebsiteResponse(webs[2], request2);*/
+
         }
 
         catch (OperationCanceledException ex)
@@ -151,6 +171,10 @@ public class ButtonController : MonoBehaviour
             else if (cancelToken.IsCancellationRequested)
             {
                 Debug.Log("Operation canceled");
+                Debug.Log("website testing for " + webs[0] + " was canceled" );
+                Debug.Log("website testing for " + webs[1] + " was canceled");
+                Debug.Log("website testing for " + webs[2] + " was canceled");
+                return;
             }
         }
         catch (UnityWebRequestException ex)
@@ -161,69 +185,87 @@ public class ButtonController : MonoBehaviour
         {
 
         }
-
-       
-
     }
 
-   /* async void TestWebsiteResponse1(string[] webs)
+    private void Update()
     {
-        *//* var cts = new System.Threading.CancellationTokenSource();
 
-         var progress = Progress.Create<float>(x => Debug.Log(x));*/
-
-
-        /*request = UnityWebRequest.Get(webs[0]).SendWebRequest();
-        request1 = UnityWebRequest.Get(webs[1]);
-        request2 = UnityWebRequest.Get(webs[2]);*//*
-
-
-
-
-
-
-        // await UniTask.WaitWhile(() => !request.isDone && !request1.isDone && !request2.isDone, cancellationToken: cts.Token);
-        // await UniTask.WaitUntil(() => request.isDone && !request1.isDone && !request2.isDone || );
-
-
-        *//*while (elapsedTime.TotalSeconds <= 8 || (request.isDone && request1.isDone && request2.isDone))
+        if (request.isDone && !isTested[0])
         {
-            CheckWebsiteResponse(webs[0] ,request1);
-            CheckWebsiteResponse(webs[1], request2);
-            CheckWebsiteResponse(webs[2], request2);
-            if (request.isDone && request1.isDone && request2.isDone)
-            {
-                return;
-            }
+            isTested[0] = true;
+            CheckWebsiteResponse(CurrentlyTestedWebs[0], request);
+        }
+        else if (request1.isDone)
+        {
+            isTested[1] = true;
+            CheckWebsiteResponse(CurrentlyTestedWebs[1], request1);
+        }
+        else if (request2.isDone)
+        {
+            isTested[2] = true;
+            CheckWebsiteResponse(CurrentlyTestedWebs[1], request2);
+        }
 
-            endTime = DateTime.Now;
-            elapsedTime = endTime - startTime;
-        }*//*
-        //  cts.Cancel();
-
-    }*/
-
-   /* async UniTask<string> GetTextAsync(UnityWebRequest req)
-    {
-        var op = await req.SendWebRequest();
-        return op.downloadHandler.text;
     }
 
-    async UniTask TestWebsitesResponse(string[] webs)
+    /* async void TestWebsiteResponse1(string[] webs)
+     {
+         *//* var cts = new System.Threading.CancellationTokenSource();
+
+          var progress = Progress.Create<float>(x => Debug.Log(x));*/
+
+
+    /*request = UnityWebRequest.Get(webs[0]).SendWebRequest();
+    request1 = UnityWebRequest.Get(webs[1]);
+    request2 = UnityWebRequest.Get(webs[2]);*//*
+
+
+
+
+
+
+    // await UniTask.WaitWhile(() => !request.isDone && !request1.isDone && !request2.isDone, cancellationToken: cts.Token);
+    // await UniTask.WaitUntil(() => request.isDone && !request1.isDone && !request2.isDone || );
+
+
+    *//*while (elapsedTime.TotalSeconds <= 8 || (request.isDone && request1.isDone && request2.isDone))
     {
+        CheckWebsiteResponse(webs[0] ,request1);
+        CheckWebsiteResponse(webs[1], request2);
+        CheckWebsiteResponse(webs[2], request2);
+        if (request.isDone && request1.isDone && request2.isDone)
+        {
+            return;
+        }
 
-        var task1 = GetTextAsync(UnityWebRequest.Get("http://google.com"));
-        var task2 = GetTextAsync(UnityWebRequest.Get("http://bing.com"));
-      //  var task3 = GetTextAsync(UnityWebRequest.Get("http://yahoo.com
+        endTime = DateTime.Now;
+        elapsedTime = endTime - startTime;
+    }*//*
+    //  cts.Cancel();
 
-            // concurrent async-wait and get results easily by tuple sy
-          //  var (google, bing, yahoo) = await UniTask.WhenAll(task1, task2, task3);
+}*/
 
-            // shorthand of WhenAll, tuple can await dire
-          //  var (google2, bing2, yahoo2) = await (task1, task2, task3);
-    } */
+    /* async UniTask<string> GetTextAsync(UnityWebRequest req)
+     {
+         var op = await req.SendWebRequest();
+         return op.downloadHandler.text;
+     }
 
-     void start()
+     async UniTask TestWebsitesResponse(string[] webs)
+     {
+
+         var task1 = GetTextAsync(UnityWebRequest.Get("http://google.com"));
+         var task2 = GetTextAsync(UnityWebRequest.Get("http://bing.com"));
+       //  var task3 = GetTextAsync(UnityWebRequest.Get("http://yahoo.com
+
+             // concurrent async-wait and get results easily by tuple sy
+           //  var (google, bing, yahoo) = await UniTask.WhenAll(task1, task2, task3);
+
+             // shorthand of WhenAll, tuple can await dire
+           //  var (google2, bing2, yahoo2) = await (task1, task2, task3);
+     } */
+
+    void start()
     {
         isStartClicked = true;
         isCancelClicked = false;
@@ -238,7 +280,9 @@ public class ButtonController : MonoBehaviour
         if (! isCancelClicked) 
         {
             await TestWebsiteResponse2(websites1);
+            isTested = new bool[] { false, false, false};
             await TestWebsiteResponse2(websites2);
+            isTested = new bool[] { false, false, false };
             await TestWebsiteResponse2(websites3);
 
             func();
@@ -255,7 +299,7 @@ public class ButtonController : MonoBehaviour
      }
     // Start is called before the first frame update
        void Start()
-     {
+       {
         stopButton.gameObject.SetActive(false);
         errorButton.gameObject.SetActive(false);
         actionStart += start;
@@ -263,14 +307,11 @@ public class ButtonController : MonoBehaviour
         actionStop += stop;
         startButton.onClick.AddListener(actionStart);
         stopButton.onClick.AddListener(actionStop);
-     }
+       }
+    
 
 
-
-       void Update()
-        {
-            
-        }
+     
 
 /*private void Updatee()
     {
